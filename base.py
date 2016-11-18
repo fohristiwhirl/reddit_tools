@@ -1,5 +1,5 @@
-import copy, json, queue, random, requests, sys, threading, time, webbrowser
-from bottle import request, response, route, run
+import copy, json, queue, random, requests, threading, time, webbrowser
+from bottle import request, route, run
 
 # -------------------------------------------------------------------------------------------
 
