@@ -142,7 +142,7 @@ class Session():
                 outfile.write(self.token.json())
 
         print()
-        print("{} token: {}".format(self.verb, self.token))
+        print("{} token: {}".format(self.verb, self.token.display()))
         print()
 
         self.remaining = None
