@@ -9,13 +9,9 @@ USER_AGENT = "{}:{}:{} (by /u/{})".format(INFO["app_platform"], INFO["app_name"]
 
 # -------------------------------------------------------------------------------------------
 
-HAVE_SEEDED_RNG = False
+random.seed()
 
 def gen_random_string():
-    global HAVE_SEEDED_RNG
-    if not HAVE_SEEDED_RNG:
-        random.seed()
-        HAVE_SEEDED_RNG = True
     result_list = []
     for n in range(32):
         result_list.append(random.choice("abcdefghijklmnopqrstuvwxyz1234567890"))
@@ -88,8 +84,9 @@ def get_access_token():
     response = requests.post(CODE_POST_URL, data = post_data, auth = (CLIENT_ID, CLIENT_SECRET), headers = INITIAL_EXTRA_HEADERS)
     response_dict = response.json()
     token = response_dict["access_token"]
+    duration = response_dict["expires_in"]
 
-    return token
+    return Token(token, duration = duration)
 
 # -------------------------------------------------------------------------------------------
 
@@ -101,16 +98,49 @@ def sanitise_endpoint(endpoint):
 
 # -------------------------------------------------------------------------------------------
 
+class Token():
+    def __init__(self, tokenstring, *, duration = None, expiry = None):
+
+        if duration is None and expiry is None:
+            raise ValueError
+
+        self.tokenstring = tokenstring
+        if duration:
+            self.expiry = time.time() + duration
+        elif expiry:
+            self.expiry = expiry
+
+    def __str__(self):
+        return "<Token string: {}, expires: {}>".format(self.tokenstring, time.ctime(self.expiry))
+
+    def json(self):
+        return '{"token": "' + self.tokenstring + '", "expiry": ' + str(self.expiry) + '}'
+
 class Session():
 
-    def __init__(self, *, token = ""):
-        if not token:
+    def __init__(self):
+
+        self.token = None
+        self.verb = ""
+
+        try:
+            with open("session.txt", "r") as infile:
+                dct = json.loads(infile.read())
+                self.token = Token(dct["token"], expiry = dct["expiry"])
+                self.verb = "Reusing old"
+        except:
+            print("Failed to load from session.txt")
+            self.token = None
+
+        if self.token is None or self.token.expiry < time.time() + 300:
+            self.verb = "Using new"
             self.token = get_access_token()
-            print()
-            print("New token: {}".format(self.token))
-            print()
-        else:
-            self.token = token
+            with open("session.txt", "w") as outfile:
+                outfile.write(self.token.json())
+
+        print()
+        print("{} token: {}".format(self.verb, self.token))
+        print()
 
         self.remaining = None
         self.reset = None
@@ -127,7 +157,7 @@ class Session():
         endpoint = sanitise_endpoint(endpoint)
 
         out_headers = copy.copy(INITIAL_EXTRA_HEADERS)
-        out_headers["Authorization"] = "bearer {}".format(self.token)
+        out_headers["Authorization"] = "bearer {}".format(self.token.tokenstring)
 
         if method.lower() == "get":
             response = requests.get(MAIN_URL + endpoint, params = params, headers = out_headers)
@@ -139,7 +169,9 @@ class Session():
             self.reset = response.headers["x-ratelimit-reset"]
             self.used = response.headers["x-ratelimit-used"]
         except:
+            print("Session.request() encountered an error...")
             print(response.text)
+            print("END OF REPORT from Session.request()")
 
         return response
 
