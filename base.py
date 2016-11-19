@@ -111,6 +111,9 @@ class Token():
             self.expiry = expiry
 
     def __str__(self):
+        raise NotImplementedError("__str__() method not supported by Token(); ask for .tokenstring instead, or call .display()")
+
+    def display(self):
         return "<Token string: {}, expires: {}>".format(self.tokenstring, time.ctime(self.expiry))
 
     def json(self):
